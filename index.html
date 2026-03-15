@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <script src="script.js" async defer></script>
+  <script src="mt.js" async defer></script>
+  <style>
+  .material-symbols-rounded {
+    font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24
+  }
+  .roboto-normal {
+    font-family: "Roboto", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings:
+      "wdth" 100;
+  }
+  body {
+    padding: 20px;
+  }
+  </style>
+  
+</head>
+<body class="roboto-normal">
+  <div class="mt-textfield--container" id="mt-textfield">
+    <div class="mt-textfield--outline">
+      <div class="mt-textfield--outline-border"></div>
+      <!-- <div class="mt-textfield--leading-icon material-symbols-rounded">search</div> -->
+      <label class="mt-textfield--label-text">First Name</label>
+      <input type="text" class="mt-textfield--input">
+      <!-- <div class="mt-textfield--trailing-icon material-symbols-rounded">cancel</div> -->
+    </div>
+  </div>
+
+  <mt-textfield label="Last name"></mt-textfield>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const mtTextfield = document.getElementById("mt-textfield");
+      const mtTextFieldInput = mtTextfield.querySelector(".mt-textfield--input");
+
+      mtTextFieldInput.addEventListener("blur", (event) => {
+        const target = event.target;
+        if (target.value === "")
+          target.parentElement.classList.remove("with-content");
+        else
+          target.parentElement.classList.add("with-content");
+      });
+    });
+  </script>
+</body>
+</html>

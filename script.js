@@ -49,7 +49,7 @@
 
   const styleSheetSymbol = Symbol("sheet");
 
-  function Style(rulesObject) {
+  function StyleSheet(rulesObject) {
     this[styleSheetSymbol] = createStyleSheet();
 
     if (typeof rulesObject !== "object")
@@ -59,7 +59,7 @@
       this.addRule(selector, rulesObject[selector]);
   }
 
-  Style.prototype.addRule = function(cssSelector, cssProperties) {
+  StyleSheet.prototype.addRule = function(cssSelector, cssProperties) {
     checkStyleArgumentTypes(cssSelector, cssProperties);
     const sheet = this[styleSheetSymbol];
     const index = sheet.insertRule(cssSelector + " {}");
@@ -94,7 +94,7 @@
   VirtualTextNode.prototype = Object.create(VirtualNode.prototype);
   VirtualTextNode.prototype.constructor = VirtualTextNode;
 
-  function element(tagName, properties, children) {
+  function element(tagName, properties, ...children) {
     const element = ce(tagName);
     const virtualElement = new VirtualElement(element);
 
@@ -118,12 +118,12 @@
       }
     }
     
-    if (typeof children === "string" || children instanceof DataBinding)
-      children = [children];
+    // if (typeof children[0] === "string" || children[0] instanceof DataBinding)
+    //   children = [children];
 
     if (!Array.isArray(children))
       return virtualElement;
-
+    console.log(children);
     for (const child of children) {
       if (child instanceof DataBinding) {
         virtualElement.bindings.textContent = child.name;
@@ -154,7 +154,6 @@
 
     if (tagName instanceof VirtualElement) {
       this[virtualElementSymbol] = tagName;
-      console.log(tagName);
       return;
     }
 
@@ -224,19 +223,11 @@
     node.appendChild(this[nativeElementSymbol]);
   }
 
-  const template = (tagName, properties, children) => {
-    return new Template(tagName, properties, children);
-  }
-
-  const style = (rulesObject) => {
-    return new Style(rulesObject);
-  }
-
-  const elementFactoryFunction = {};
+  const domBuilderFunctions = {};
   "div form input button textarea select option label p h1 h2 h3 h4 h5 h6 section nav footer header main"
     .split(" ")
     .forEach(item => {
-      elementFactoryFunction[item] = element.bind(null, item);
+      domBuilderFunctions[item] = element.bind(null, item);
     });
 
   function DataBinding(name, defaultValue) {
@@ -248,19 +239,13 @@
     return new DataBinding(name, defaultValue);
   }
 
-  const webComponentCallbackArguments = {
-    Template, template, Style, style, 
-    dataBinding: { bind },
-    elements: elementFactoryFunction
-  };
+  function createCustomElementClass(options) {
+    const template = options.htmlTemplate;
+    const style = options.stylesheet;
 
-  function createCustomElementClass(template, style) {
-    const bindPropertyNames = template[templateBindingsSymbol];
     return class extends HTMLElement {
-      // TODO: retrieved all the binded property from the template and put it here
-      // Current Problem: getNativeElement must be invoked first before accessing bindPropertyNames
-      // BUT this method must be invoked only inside the constructor to save memory footprint
-      static observedAttributes = bindPropertyNames;
+      static observedAttributes = options.bindingNameList;
+
       constructor() {
         super();
         this.bindings = {};
@@ -268,12 +253,31 @@
         HTMLElement.observedAttributes = template[templateBindingsSymbol];
       }
 
-      attributeChangedCallback(name, oldValue, newValue) {
+      attributeChangedCallback(name, _, newValue) {
         if (this.bindings[name] instanceof Signal) {
           this.bindings[name].set(newValue);
         }
       }
     }
+  }
+
+  function componentHtmlTemplate(host, template) {
+    if (!(template instanceof VirtualNode))
+      throw new Error("Component html template must be an instanceof VirtualNode.");
+    host.htmlTemplate = new Template(template);
+  }
+
+  function componentStylesheet(host, styles) {
+    if (typeof styles !== "object" || Array.isArray(styles))
+      throw new Error("Component stylesheet must be an object.");
+    host.stylesheet = new StyleSheet(styles);
+  }
+
+  function contentBindFunction(host, name, defaultValue) {
+    if (typeof name !== "string")
+      throw new Error("Binding name must be a string.");
+    host.bindingNameList.push(name);
+    return new DataBinding(name, defaultValue);
   }
 
   function WebComponent(name, callback) {
@@ -282,11 +286,17 @@
     if (name.indexOf("-") === -1)
       throw new Error("Tag name must have at least one hypen '-'.");
 
-    const result = callback(webComponentCallbackArguments);
-    if (!result || !result.html || !result.css) 
+    const options = { htmlTemplate: null, stylesheet: null, bindingNameList: [] };
+    const template = componentHtmlTemplate.bind(null, options);
+    const style = componentStylesheet.bind(null, options);
+    const contentBind = contentBindFunction.bind(null, options);
+    const library = { dataBinder: { contentBind }, domBuilder: domBuilderFunctions };
+    
+    callback(template, style, library);
+    
+    if (!options.htmlTemplate || !options.stylesheet) 
       throw new Error("WebComponent callback must return an object containing an 'html' property with an instance of Template as its value, and a 'css' property with an instance of Style as its value.");
-
-    customElements.define(name, createCustomElementClass(result.html, result.css));
+    customElements.define(name, createCustomElementClass(options));
   }
 
   Object.defineProperty(window, "WebComponent", {
@@ -296,16 +306,15 @@
 
 
 
-const mtButton = new WebComponent("mt-textfield", (lib) => {
-  const { template, style } = lib;
-  const { div, label, input } = lib.elements;
-  const { bind } = lib.dataBinding;
+const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
+  const { div, label, input } = lib.domBuilder;
+  const { contentBind } = lib.dataBinder;
   
-  const html = template(
-    div({ className: "mt-textfield--container"}, [
-      div({ className: "mt-textfield--outline", id: "mtTextfield_Outline"}, [
+  template(
+    div({ className: "mt-textfield--container"},
+      div({ className: "mt-textfield--outline", id: "mtTextfield_Outline"},
         div({ className: "mt-textfield--outline-border"}),
-        label({ className: "mt-textfield--label-text"}, bind("label")),
+        label({ className: "mt-textfield--label-text"}, contentBind("label")),
         input({ className: "mt-textfield--input", 
           onBlur(event) {
             const target = event.target;
@@ -315,11 +324,11 @@ const mtButton = new WebComponent("mt-textfield", (lib) => {
               target.parentElement.classList.add("with-content");
           }
         })
-      ])
-    ])
+      )
+    )
   );
 
-  const css = style({
+  style({
     ":root": {
       "--mat-1dp": "1px",
       "--mt-textfield-height": "56px"
@@ -402,5 +411,4 @@ const mtButton = new WebComponent("mt-textfield", (lib) => {
   });
 
   // console.log(html.getNativeElement());
-  return {html, css};
 });

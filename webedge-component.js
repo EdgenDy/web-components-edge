@@ -7,6 +7,7 @@
 
   const signalValueSymbol = Symbol("signalValue");
   const taskQueueSymbol = Symbol("taskQueue");
+
   function Signal(value) {
     this[signalValueSymbol] = value;
     this[taskQueueSymbol] = new Set();
@@ -89,15 +90,38 @@
     }
   }
 
+  function propertyBinding(element, propertyName, newValue) {
+    element[propertyName] = newValue;
+  }
+
+  function classNamePartBinding(element, callback, option, newValue) {
+    const className = callback(newValue);
+    if (!className) {
+      console.log(newValue, option);
+      element.classList.remove(option.oldValue);
+      return;
+    }
+    element.classList.add(className);
+    option.oldValue = className;
+  }
+
   function VirtualNode() {}
 
   VirtualNode.prototype.flatten = function(template, nodeInstance) {
     const node = this.node.cloneNode(true);
 
     for (const binding of this.bindings) {
-      const signal = new Signal();
+      let signal = nodeInstance.bindings[binding.name];
+      if (!signal)
+        signal = new Signal();
       nodeInstance.bindings[binding.name] = signal;
-      signal.effect(propertyBinding.bind(null, node, binding.nodePropertyName));
+
+      if (binding instanceof NodePropertyBinding)
+        signal.effect(propertyBinding.bind(null, node, binding.nodePropertyName));
+      else if (binding instanceof ElementClassNamePartBinding)
+        signal.effect(classNamePartBinding.bind(null, node, binding.callback, {}));
+      else
+        throw new Error("Unknown instance of Data Binding");
     }
 
     if (this instanceof VirtualTextNode)
@@ -149,7 +173,21 @@
   }
 
   const commonlyUsedPropertyChecker = {
-    className: elementPropertySetter.bind(null, "className"),
+    className: (element, value, virtualElement) => {
+      if (Array.isArray(value)) {
+        for (const className of value) {
+          if (className instanceof DataBinding) {
+            virtualElement.bindings.push(new ElementClassNamePartBinding(className.name, className.defaultValue || function() {}));
+            continue;
+          }
+          if (!className)
+            continue;
+          element.classList.add(className);
+        }
+        return;
+      }
+      elementPropertySetter("className", element, value, virtualElement);
+    },
     id: elementPropertySetter.bind(null, "id"),
     value: elementPropertySetter.bind(null, "value")
   };
@@ -225,10 +263,6 @@
     this[templateBindingsSymbol].push(name);
   }
 
-  function propertyBinding(element, propertyName, newValue) {
-    element[propertyName] = newValue;
-  }
-
   Template.prototype.getNativeElement = function(nodeClassInstance) {
     return this[templateNativeElementSymbol];
   }
@@ -271,6 +305,14 @@
 
   NodePropertyBinding.prototype = Object.create(DataBinding.prototype);
   NodePropertyBinding.prototype.constructor = NodePropertyBinding;
+
+  function ElementClassNamePartBinding(name, callback) {
+    this.name = name;
+    this.callback = callback;
+  }
+
+  ElementClassNamePartBinding.prototype = Object.create(DataBinding.prototype);
+  ElementClassNamePartBinding.prototype.constructor = ElementClassNamePartBinding;
 
   function createCustomElementClass(options) {
     const template = options.htmlTemplate;
@@ -322,6 +364,12 @@
     return new DataBinding(name, defaultValue);
   }
 
+  function bindCallback(name, callback) {
+    if (name instanceof DataBinding)
+      name = name.name;
+    return new DataBinding(name, callback);
+  }
+
   function WebComponent(name, callback) {
     if (typeof name !== "string")
       throw new Error("Argument 1 must be a type of string and a valid html tag name.");
@@ -333,7 +381,8 @@
     const style = componentStylesheet.bind(null, options);
     const bindString = bindData.bind(null, "string", options);
     const bindFunction = bindData.bind(null, "string", options);
-    const library = { dataBinder: { bindString, bindFunction }, domBuilder: domBuilderFunctions };
+    const bindCondition = bindCallback.bind(null);
+    const library = { dataBinder: { bindString, bindFunction, bindCondition, effectFor: bindCondition, signalFor: bindString }, domBuilder: domBuilderFunctions };
     
     callback(template, style, library);
     

@@ -1,24 +1,25 @@
 const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
   const { div, label, input } = lib.domBuilder;
-  const { bindString } = lib.dataBinder;
+  const { effectFor, signalFor } = lib.dataBinder;
 
-  // TODO: implement a conditional Binding
-  // bindConditionFor("value", (data) => data.value !== "" ? "" : "");
-  
+  const textFieldLabel = signalFor("label");
+  const textFieldValue = signalFor("value");
+  const withContentChecker = effectFor(textFieldValue, (value) => !value ? "" : "with-content");
+
+  function onTextFieldBlur(event) {
+    const target = event.target;
+    if (target.value === "")
+      target.parentElement.classList.remove("with-content");
+    else
+      target.parentElement.classList.add("with-content");
+  }
+
   template(
     div({ className: "mt-textfield--container"},
-      div({ className: "mt-textfield--outline", id: "mtTextfield_Outline"},
+      div({ className: ["mt-textfield--outline", withContentChecker], id: "mtTextfield_Outline"},
         div({ className: "mt-textfield--outline-border"}),
-        label({ className: "mt-textfield--label-text"}, bindString("label")),
-        input({ className: "mt-textfield--input", value: bindString("value"),
-          onBlur(event) {
-            const target = event.target;
-            if (target.value === "")
-              target.parentElement.classList.remove("with-content");
-            else
-              target.parentElement.classList.add("with-content");
-          }
-        })
+        label({ className: "mt-textfield--label-text"}, textFieldLabel),
+        input({ className: "mt-textfield--input", value: textFieldValue, onBlur: onTextFieldBlur })
       )
     )
   );
@@ -76,7 +77,8 @@ const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
     },
     ".mt-textfield--input, .mt-textfield--label-text": {
       fontSize: "16px",
-      minWidth: "25px"
+      minWidth: "25px",
+      fontFamily: "Roboto"
     },
     ".mt-textfield--leading-icon, .mt-textfield--trailing-icon, .mt-textfield--input, .mt-textfield--label-text": {
       color: "#49454F"

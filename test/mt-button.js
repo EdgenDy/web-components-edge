@@ -1,10 +1,15 @@
 const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
   const { div, label, input } = lib.domBuilder;
-  const { effectFor, signalFor } = lib.dataBinder;
+  const { effectFor, property, state } = lib.dataBinder;
 
-  const textFieldLabel = signalFor("label");
-  const textFieldValue = signalFor("value");
-  const withContentChecker = effectFor(textFieldValue, (value) => !value ? "" : "with-content");
+  const textFieldLabel = property("label");
+  const textFieldValue = property("textFieldValue");
+  // const withContentChecker = textFieldValue.watch((value) => !value ? "" : "with-content");
+
+  const leadingIcon = property("leadingicon");
+  const trailingIcon = property("trailingicon");
+
+  const withTrailingIcon = state("withTrailingIcon");
 
   function onTextFieldBlur(event) {
     const target = event.target;
@@ -14,20 +19,16 @@ const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
       target.parentElement.classList.add("with-content");
   }
 
-  template(
-    div({ className: "mt-textfield--container"},
-      div({ className: ["mt-textfield--outline", withContentChecker], id: "mtTextfield_Outline"},
-        div({ className: "mt-textfield--outline-border"}),
-        label({ className: "mt-textfield--label-text"}, textFieldLabel),
-        input({ className: "mt-textfield--input", value: textFieldValue, onBlur: onTextFieldBlur })
-      )
-    )
-  );
+  
 
   style({
     ":root": {
       "--mat-1dp": "1px",
       "--mt-textfield-height": "56px"
+    },
+    "mt-textfield": {
+      display: "inline-block",
+      padding: "8px"
     },
     ".mt-textfield--container": {
       display: "inline-flex",
@@ -70,7 +71,10 @@ const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
       borderColor: "#6750A4"
     },
     ".mt-textfield--leading-icon, .mt-textfield--trailing-icon": {
-      userSelect: "none"
+      width: "24px",
+      height: "24px",
+      userSelect: "none",
+      overflow: "hidden"
     },
     ".mt-textfield--trailing-icon": {
       cursor: "pointer"
@@ -90,12 +94,12 @@ const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
       top: "50%",
       transform: "translateY(-50%)",
       zIndex: "1",
-      transition: "font-size ease-in-out .15s, transform ease-in-out .15s, top ease-in-out .15s, left ease-in-out .15s, color ease-in-out .15s"
+      transition: "font-size ease-in-out .15s, top ease-in-out .15s, left ease-in-out .15s, color ease-in-out .15s"
     },
     ".mt-textfield--outline.leading-icon > .mt-textfield--label-text": {
       left: "52px"
     },
-    ".mt-textfield--outline:focus-within:not(.width-content) > .mt-textfield--label-text": {
+    ".mt-textfield--outline:focus-within > .mt-textfield--label-text": {
       color: "#6750A4"
     },
     ".mt-textfield--outline.with-content > .mt-textfield--label-text, .mt-textfield--outline:focus-within > .mt-textfield--label-text": {
@@ -106,4 +110,33 @@ const mtButton = new WebComponent("mt-textfield", (template, style, lib) => {
       fontSize: "12px"
     }
   });
+
+  const withLeadingIcon = state("withLeadingIcon");
+  const leadingIconStateChecker = withLeadingIcon.watch({ on: "leading-icon", off: "" });
+  // const leadingIconStateChecker = state("withLeadingIcon", false, { on: "leading-icon" });
+
+  template(
+    div({ className: "mt-textfield--container"},
+      div({ className: ["mt-textfield--outline", leadingIconStateChecker], id: "mtTextfield_Outline"},
+        div({ className: "mt-textfield--outline-border"}),
+        
+        div({ display: withLeadingIcon, className: "mt-textfield--leading-icon material-symbols-rounded"}, "search"),
+
+        label({ className: "mt-textfield--label-text"}, textFieldLabel),
+        input({ className: "mt-textfield--input", id: "mt-textfield--input", value: textFieldValue, onBlur: property("blurEventCallback")}),
+
+        div({ display: withTrailingIcon, className: "mt-textfield--trailing-icon material-symbols-rounded", onClick: property("cancelButtonClickCallback") }, "cancel")
+      )
+    )
+  );
+});
+
+mtButton.setPropertyValue("blurEventCallback", function(event) {
+  console.log("blurEventCallback", this);
+  console.log(this.enableState("withTrailingIcon"));
+});
+
+mtButton.setPropertyValue("cancelButtonClickCallback", function(event) {
+  console.log(this.getProperty("label").set("New Label"));
+  console.log(this.getProperty("textFieldValue").set("Hello World!"));
 });

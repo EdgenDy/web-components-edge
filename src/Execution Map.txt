@@ -1,0 +1,86 @@
+WebComponent(name -> string, webComponentCallback -> function)
+│
+├─ webComponentCallback() 
+│  │
+│  └─ template( div({}) )
+│     │
+│     ├─ state("")
+│     │  │
+│     │  └─ hostOptions.stateMap.set( name{ string }, state{ WebComponentState } )
+│     │  
+│     ├─ state("", { on,off })
+│     │  │
+│     │  └─ hostOptions.watchStateMap.set( name{ string }, state{ WebComponentStateTogglingValue } )
+│     │  
+│     ├─ property("")
+│     │  │ 
+│     │  └─ hostOptions.propertyMap.set( name{ string }, property{ WebComponentProperty })
+│     │  
+│     └─ callback("")
+│        │
+│        └─ hostOptions.callbackMap.set( name{ string }, callback{ WebComponentCallback } )
+│      
+register() from WebComponent
+│
+├─ createCustomElementClass( hostOptions ) as const customHTMLElementClass
+│  │
+│  └─ class extends HTMLElement {}
+│  
+└─ customElements.define(name -> string, customHTMLElementClass -> Custom HTMLElement class) 
+
+
+<custom-element>
+│
+└─ constructor() of (class extends HTMLElement {})
+   │
+   ├─ for of hostOptions.propertyMap 
+   │  │
+   │  └─ this.propertyMap.set( string, Signal<any> ) 
+   │
+   ├─ for of hostOptions.stateMap 
+   │  │
+   │  └─ this.stateMap.set( string, Signal<boolean> ) 
+   │
+   ├─ for of hostOptions.callbackMap 
+   │  │
+   │  └─ this.callbackMap.set( string, Signal<boolean> ) 
+   │
+   ├─ for of hostOptions.watchCallbackMap 
+   │  │
+   │  └─ this.watchCallbackMap.get( string ){ Signal }.effect( callback{ function }.bind(this{ Custom HTMLElement }) ) 
+   │
+   ├─ template{ WebComponentTemplate }.initialize( this )
+   │  │
+   │  └─ this.rootNode{ VirtualElement }.flatten( component{ Custom HTMLElement } )
+   │     │
+   │     ├─ const node = this{ VirtualNode }.node{ HTMLElement }.cloneNode( true )
+   │     │ 
+   │     ├─ bindComponentWithNodeBindings( component{ Custom HTMLElement }, node{ HTMLElement }, this{ VirtualNode }.bindings{ Map<string, WebComponentBindings> } )
+   │     │  │
+   │     │  └─ for [name{ string }, value{ WebComponentBindings }] of bindings
+   │     │     │
+   │     │     ├─ component -> Custom HTMLElement.watchProperty( property -> WebComponentProperty.getName(), componentPropertyBinding -> function.bind(null, node -> HTMLElement, name -> string) )
+   │     │     │
+   │     │     ├─ component -> Custom HTMLElement.watchState( state -> WebComponentState.getName(), componentStateBinding -> function.bind(null, node -> HTMLElement, name -> string) )
+   │     │     │
+   │     │     ├─ component -> Custom HTMLElement.watchState( state -> WebComponentStateTogglingValue.getName(), componentStateTogglingValueBinding -> function.bind(null, node -> HTMLElement, name -> string, state -> WebComponentStateTogglingValue.getTogglingValue()) )
+   │     │     │
+   │     │     ├─ node -> HTMLElement[ name -> string ] = callback -> WebComponentCallback.getValue -> function.bind( component -> Custom HTMLElement )
+   │     │     │
+   │     │     ├─ value -> WebComponentReference.setValue( node -> HTMLElement )
+   │     │   
+   │     │
+   │     └─ for child -> VirtualElement of this -> VirtualElement.children -> VirtualElement[]
+   │        │
+   │        └─ const childNode = child.flatten( component -> Custom HTMLElement )
+   │          
+   └─ for of hostOptions.referenceMap 
+      │
+      └─ this.referenceMap.set( string, Signal<HTMLElement> ) 
+    
+
+  ┌  ─  ┬  ─  ┐
+  │     │     │
+  ├  ─  ┼  ─  ┤
+  │     │     │
+  └  ─  ┴  ─  ┘

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  
+  <style>
+    .material-symbols-rounded {
+    font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24
+  }
+  .roboto-normal {
+    font-family: "Roboto", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings:
+      "wdth" 100;
+  }
+  </style>
+</head>
+<body>
+
+  <mt-textfield label="First name" leadingicon="search" trailingicon="cancel"></mt-textfield>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "webcomp": "../dist/webcomp.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import { WebComponent } from "webcomp";
+
+    const materialTextField = new WebComponent("mt-textfield", (template, styles, lib) => {
+      const { div, label, input } = lib.dom;
+      const { property, state, callback, reference } = lib.component;
+
+      const withLeadingIcon = state("withLeadingIcon");
+      const leadingIconClassname = state(withLeadingIcon, { on: "leading-icon" });
+
+      const withTrailingIcon = state("withTrailingIcon");
+      const trailingIconClassname = state(withTrailingIcon, { on: "trailing-icon" });
+
+      const withContentClassname = state("withContent", { on: "with-content" });
+
+      template(
+        div({ id: "textfield-container", className: "mt-textfield--container"},
+          div({ className: ["mt-textfield--outline", leadingIconClassname, trailingIconClassname, withContentClassname], id: "mtTextfield_Outline"},
+            div({ className: "mt-textfield--outline-border"}),
+
+            div({ display: withLeadingIcon, className: "mt-textfield--leading-icon material-symbols-rounded"}, property("leadingicon")),
+
+            label({ className: "mt-textfield--label-text"}, property("label")),
+            input({ className: "mt-textfield--input", id: "mt-textfield--input", value: property("textFieldValue"), ref: reference("textfield"), autocomplete: "off", onblur: callback("textfieldBlurCallback") }),
+            
+            div({ display: withTrailingIcon, className: "mt-textfield--trailing-icon material-symbols-rounded", onclick: callback("cancelButton"), tabIndex: -1 }, property("trailingicon"))
+          )
+        )
+      );
+
+      styles({
+        ":root": {
+          "--mat-1dp": "1px",
+          "--mt-textfield-height": "56px"
+        },
+        "mt-textfield": {
+          display: "inline-block",
+          padding: "8px"
+        },
+        ".mt-textfield--container": {
+          display: "inline-flex",
+          flexDirection: "column"
+        },
+        ".mt-textfield--outline": {
+          position: "relative",
+          height: "var(--mt-textfield-height)",
+          display: "flex",
+          alignItems: "center",
+          padding: "0px 16px",
+          gap: "16px"
+        },
+        ".mt-textfield--outline.leading-icon": {
+          paddingLeft: "12px"
+        },
+        ".mt-textfield--outline.trailing-icon": {
+          paddingRight: "12px"
+        },
+        ".mt-textfield--outline:focus-within": {
+          borderWidth: "3px"
+        },
+        ".mt-textfield--input": {
+          border: "none",
+          outline: "none",
+          zIndex: "2",
+          background: "none"
+        },
+        ".mt-textfield--outline-border": {
+          position: "absolute",
+          inset: "0",
+          border: "1px solid #79747E",
+          borderRadius: "4px",
+          zIndex: "-1",
+          transition: "border-color ease-in-out .1s, border-width ease-in-out .1s"
+        },
+        ".mt-textfield--outline:focus-within > .mt-textfield--outline-border": {
+          borderWidth: "3px",
+          borderRadius: "4px",
+          borderColor: "#6750A4"
+        },
+        ".mt-textfield--leading-icon, .mt-textfield--trailing-icon": {
+          width: "24px",
+          height: "24px",
+          userSelect: "none",
+          overflow: "hidden"
+        },
+        ".mt-textfield--trailing-icon": {
+          cursor: "pointer"
+        },
+        ".mt-textfield--input, .mt-textfield--label-text": {
+          fontSize: "16px",
+          minWidth: "25px",
+          fontFamily: "Roboto"
+        },
+        ".mt-textfield--leading-icon, .mt-textfield--trailing-icon, .mt-textfield--input, .mt-textfield--label-text": {
+          color: "#49454F"
+        },
+        ".mt-textfield--label-text": {
+          display: "inline-block",
+          backgroundColor: "white",
+          position: "absolute",
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: "1",
+          transition: "font-size ease-in-out .15s, top ease-in-out .15s, left ease-in-out .15s, color ease-in-out .15s"
+        },
+        ".mt-textfield--outline:focus-within > .mt-textfield--label-text": {
+          color: "#6750A4"
+        },
+        ".mt-textfield--outline.with-content > .mt-textfield--label-text, .mt-textfield--outline:focus-within > .mt-textfield--label-text": {
+          top: "0px",
+          paddingLeft: "4px",
+          paddingRight: "4px",
+          left: "12px",
+          fontSize: "12px"
+        },
+        ".mt-textfield--outline.leading-icon > .mt-textfield--label-text": {
+          left: "52px"
+        },
+      });
+    });
+
+    materialTextField.setCallbackValue("cancelButton", function() {
+      const textfield = this.getReference("textfield");
+      textfield.value = "";
+      textfield.focus();
+    });
+
+    materialTextField.setCallbackValue("textfieldBlurCallback", function() {
+      const textfield = this.getReference("textfield");
+
+      if (textfield.value.length > 0)
+        this.setStateOn("withContent");
+      else
+        this.setStateOff("withContent");
+    });
+
+    materialTextField.watchProperty("leadingicon", function(value) {
+      this.setStateOn("withLeadingIcon");
+    });
+
+    materialTextField.watchProperty("trailingicon", function(value) {
+      this.setStateOn("withTrailingIcon");
+    });
+
+    materialTextField.register();
+  </script>
+</body>
+</html>

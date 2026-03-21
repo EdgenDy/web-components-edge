@@ -125,12 +125,12 @@
 </head>
 <body class="roboto-normal">
   <div class="mt-textfield--container" id="mt-textfield">
-    <div class="mt-textfield--outline .leading-icon .trailing-icon">
+    <div class="mt-textfield--outline leading-icon trailing-icon">
       <div class="mt-textfield--outline-border"></div>
-      <!-- <div class="mt-textfield--leading-icon material-symbols-rounded">search</div> -->
+      <div class="mt-textfield--leading-icon material-symbols-rounded">search</div>
       <label class="mt-textfield--label-text">First Name</label>
       <input type="text" class="mt-textfield--input">
-      <!-- <div class="mt-textfield--trailing-icon material-symbols-rounded">cancel</div> -->
+      <div class="mt-textfield--trailing-icon material-symbols-rounded">cancel</div>
     </div>
   </div>
 
@@ -186,11 +186,13 @@
     });
 
     materialTextField.setPropertyValue("componentLabel", "Component Label");
+    materialTextField.setPropertyValue("buttonclassname", "sample-classname");
+
     materialTextField.setCallbackValue("buttonClickCallback", function() {
       console.log(this.stateMap.get("isError").set(true));
       this.setStateOn("showContinueButton");
     });
-    materialTextField.setPropertyValue("buttonclassname", "sample-classname");
+    
     materialTextField.setStateOn("showContinueButton");
     materialTextField.register();
   </script>

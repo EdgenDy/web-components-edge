@@ -84,14 +84,14 @@ class StyleSheet {
         ruleStyle.setProperty(name, value);
         continue;
       }
-      ruleStyle.setProperty(name, value);
+      (ruleStyle as any)[name] = value;
     }
   }
 }
 
 type CSSStyleRulesObject = { [index: string]: { [index: string]: string } };
 
-function styles(host: WebComponentInitializationOptions, rulesObject: CSSStyleRulesObject): void {
+function styles(host: WebComponentInitOptions, rulesObject: CSSStyleRulesObject): void {
   if (typeof rulesObject !== "object" || Array.isArray(rulesObject))
     throw new Error("Invalid argument, rulesObject must be an object containing css rules.");
   host.styles = new StyleSheet(rulesObject);
@@ -146,8 +146,8 @@ type TogglingValue = { on: any, off: any };
 class WebComponentStateTogglingValue extends State {
   private togglingValue!: TogglingValue;
 
-  public constructor(name: string, value: any, togglingValue: TogglingValue) {
-    super(name, value);
+  public constructor(name: string, togglingValue: TogglingValue, value?: boolean) {
+    super(name, value || false);
     this.togglingValue = togglingValue;
   }
 
@@ -163,13 +163,40 @@ class WebComponentStateTogglingValue extends State {
   }
 }
 
-function state(hostOptions: WebComponentInitializationOptions, name: string, value?: boolean, togglingValue?: any): State {
-  let state = togglingValue !== undefined ? 
-    new WebComponentStateTogglingValue(name, value, togglingValue) : 
-    new WebComponentState(name, value);
+// state
+function state(hostOptions: WebComponentInitOptions, name: string | WebComponentState, value?: boolean | TogglingValue, stateValue?: boolean): State {
+  if (typeof value === "boolean" || typeof value === "undefined") {
+    // Default State
+    if (typeof name !== "string")
+      throw new Error("Invalid argument, 'name' must be a string.");
 
-  hostOptions.stateMap.set(name, state);
-  return state;
+    let state = hostOptions.stateMap.get(name as string);
+    if (!state) {
+      state = new WebComponentState(name as string, value || false);
+      hostOptions.stateMap.set(name as string, state);
+    }
+    return state;
+  }
+
+  // Toggling Value State
+  if (typeof value === "object") {
+    let stateName: string;
+    if (typeof name === "string")
+      stateName = name;
+    else if (name instanceof WebComponentState)
+      stateName = name.getName();
+    else
+      throw new Error("Invalid argument, nameOrState argument must be a string or an instance of WebComponentState returned by state().");
+   
+    let state = hostOptions.watchStateMap.get(stateName);
+    if (!state) {
+      state = new WebComponentStateTogglingValue(stateName, value as TogglingValue, stateValue);
+      hostOptions.watchStateMap.set(stateName, state);
+    }
+    return state;
+  }
+
+  throw new Error("Invalid arguments.");
 }
 
 class WebComponentProperty {
@@ -194,9 +221,16 @@ class WebComponentProperty {
   }
 }
 
-function property(hostOptions: WebComponentInitializationOptions, name: string, value?: any): WebComponentProperty {
-  let property = new WebComponentProperty(name, value);
-  hostOptions.propertyMap.set(name, property);
+function property(hostOptions: WebComponentInitOptions, name: string, value?: any): WebComponentProperty {
+  let property = hostOptions.propertyMap.get(name);
+  if (!property) {
+    property = new WebComponentProperty(name, value);
+    hostOptions.propertyMap.set(name, property);
+    return property;
+  }
+
+  if (value)
+    property.setValue(value);
   return property;
 }
 
@@ -222,13 +256,41 @@ class WebComponentCallback {
   }
 }
 
-function weComponentCallback(hostOptions: WebComponentInitializationOptions, name: string, value: Function) {
+function weComponentCallback(hostOptions: WebComponentInitOptions, name: string, value: Function) {
   const callback = new WebComponentCallback(name, value);
   hostOptions.callbackMap.set(name, callback);
   return callback;
 }
 
-type WebComponentBindings = WebComponentState | WebComponentProperty | WebComponentCallback | WebComponentStateTogglingValue;
+class WebComponentReference {
+  private name!: string;
+  private value: HTMLElement | undefined;
+
+  public constructor(name: string, value?: HTMLElement) {
+    this.name = name;
+    this.value = value;
+  }
+
+  public getName() {
+    return this.name;
+  }
+
+  public getValue() {
+    return this.value;
+  }
+
+  public setValue(value: HTMLElement) {
+    this.value = value;
+  }
+}
+
+function reference(hostOptions: WebComponentInitOptions, name: string) {
+  const ref = new WebComponentReference(name);
+  hostOptions.referenceMap.set(name, ref);
+  return ref;
+}
+
+type WebComponentBindings = WebComponentState | WebComponentProperty | WebComponentCallback | WebComponentStateTogglingValue | WebComponentReference;
 type NodeAttributeBindings = Map<string, WebComponentBindings>;
 type VirtualNodeChildren = VirtualNode | string | WebComponentProperty | WebComponentStateTogglingValue;
 
@@ -287,11 +349,19 @@ function bindComponentWithNodeBindings(component: WebComponentElementConstructor
     if (value instanceof WebComponentStateTogglingValue) {
       const state = value as WebComponentStateTogglingValue;
       component.watchState(state.getName(), componentStateTogglingValueBinding.bind(null, node, name, state.getTogglingValue()));
+      continue;
     }
 
     if (value instanceof WebComponentCallback) {
       const callback = value as WebComponentCallback;
       (node as any)[name] = callback.getValue().bind(component);
+      continue;
+    }
+
+    if (value instanceof WebComponentReference) {
+      const ref = value as WebComponentReference;
+      ref.setValue(node as HTMLElement);
+      continue;
     }
   }
 }
@@ -309,13 +379,25 @@ function componentStateBinding(node: any, propertyName: string, newValue: boolea
 }
 
 function componentStateTogglingValueBinding(node: any, propertyName: string, togglingValue: TogglingValue, newValue: boolean) {
-  console.log(propertyName);
   if (propertyName === "classList") {
     const onValue = togglingValue.on;
     const offValue = togglingValue.off;
-    node.classList.remove(newValue === true ? offValue : onValue);
-    node.classList.add(newValue === true ? onValue : offValue);
-    return;
+
+    if (newValue === true) {
+      if (offValue)
+        node.classList.remove(offValue);
+      if (onValue)
+      node.classList.add(onValue);
+      return;
+    }
+
+    if (newValue === false) {
+      if (offValue)
+        node.classList.add(offValue);
+      if (onValue)
+      node.classList.remove(onValue);
+      return;
+    }
   }
   node[propertyName] = newValue === true ? togglingValue.on : togglingValue.off;
 }
@@ -360,8 +442,8 @@ class WebComponentTemplate {
   }
 }
 
-type WebComponentDataManagement = WebComponentProperty | WebComponentStateTogglingValue | WebComponentState | WebComponentCallback;
-type HTMLElementAttributeValue = string | WebComponentDataManagement;
+type WebComponentDataManagement = WebComponentProperty | WebComponentStateTogglingValue | WebComponentState | WebComponentCallback | WebComponentReference;
+type HTMLElementAttributeValue = string | number | boolean | WebComponentDataManagement;
 
 type HTMLElementAttributeName = "id" | "className" | "title";
 
@@ -382,18 +464,18 @@ function createVirtualElement(tagName: string, attributes: HTMLElementAttribute,
   return virtualElement;
 }
 
-function setElementAttributes(element: HTMLElement, attributeName: string, attributeValue: HTMLElementAttributeValue | EventListenerCallback | undefined, virtualElement: VirtualElement) {
+function setElementAttributes(element: HTMLElement, attributeName: string, attributeValue: HTMLElementAttributeValue | undefined, virtualElement: VirtualElement) {
   if (attributeName.indexOf("on") === 0) {
     virtualElement.addEventListener(attributeName.toLowerCase(), attributeValue as WebComponentCallback);
     return;
   }
-
-  if (typeof attributeValue === "string") {
-    setElementAttributeAsString(element, attributeName, attributeValue, virtualElement);
+  
+  if ("string boolean number".indexOf(typeof attributeValue) > -1) {
+    setElementAttributeAsString(element, attributeName, attributeValue as string, virtualElement);
     return;
   }
 
-  if (attributeValue instanceof WebComponentProperty || attributeValue instanceof WebComponentState || attributeValue instanceof WebComponentStateTogglingValue) {
+  if (attributeValue instanceof WebComponentProperty || attributeValue instanceof WebComponentState || attributeValue instanceof WebComponentStateTogglingValue || attributeValue instanceof WebComponentReference) {
     setElementAttributeAsWebComponent(element, attributeName, attributeValue, virtualElement);
     return;
   }
@@ -406,12 +488,16 @@ function setElementAttributes(element: HTMLElement, attributeName: string, attri
   throw new Error("Invalid value for the attribute '" + attributeName + "'");
 }
 
-function setElementAttributeAsString(element: HTMLElement, attributeName: string, attributeValue: string, virtualElement: VirtualElement) {
+function setElementAttributeAsString(element: HTMLElement, attributeName: string, attributeValue: string | number | boolean, virtualElement: VirtualElement) {
   if (attributeName === "className") {
-    element.className = attributeValue;
+    element.className = attributeValue as string;
     return;
   }
-  element.setAttribute(attributeName, attributeValue);
+  
+  if (attributeName === "id")
+    virtualElement.addBinding("id", new WebComponentReference(attributeValue as string, element));
+  // element.setAttribute(attributeName, attributeValue);
+  (element as any)[attributeName] = attributeValue;
 }
 
 function setElementAttributeAsWebComponent(element: HTMLElement, attributeName: string, attributeValue: WebComponentDataManagement, virtualElement: VirtualElement) {
@@ -472,15 +558,18 @@ const domBuilders: DOMBuilderMap = {};
     domBuilders[item] = createVirtualElement.bind(null, item);
   });
 
-type WebComponentInitializationOptions = {
+type WebComponentInitOptions = {
   template: WebComponentTemplate | null,
   styles: StyleSheet | null,
   stateMap: Map<string, State>,
   propertyMap: Map<string, WebComponentProperty>,
-  callbackMap: Map<string, WebComponentCallback>
+  callbackMap: Map<string, WebComponentCallback>,
+  referenceMap: Map<string, WebComponentReference>,
+  watchCallbackMap: Map<string, Function[]>,
+  watchStateMap: Map<string, State>;
 };
 
-function template(host: WebComponentInitializationOptions, rootNode: VirtualElement): void {
+function template(host: WebComponentInitOptions, rootNode: VirtualElement): void {
   if (!(rootNode instanceof VirtualElement))
     throw new Error("Invalid argument, rootNode must be an instance of VirtualElement.");
   host.template = new WebComponentTemplate(rootNode);
@@ -498,9 +587,13 @@ type WebComponentConstructorCallback = (
   }
 ) => void;
 
+type WebComponentPropertyValue = string | number | boolean;
+type WebComponentPropertiesObject = { [index: string]: WebComponentPropertyValue };
+type WebComponentStatesObject = { [index: string]: boolean };
+
 export class WebComponent {
   private name!: string;
-  private options!: WebComponentInitializationOptions;
+  private options!: WebComponentInitOptions;
 
   public constructor(name: string, callback: WebComponentConstructorCallback) {
     if (typeof name !== "string")
@@ -509,7 +602,17 @@ export class WebComponent {
     if (typeof callback !== "function")
       throw new Error("Invalid argument, callback must be a function.");
 
-    const options = { template: null, styles: null, stateMap: new Map(), propertyMap: new Map(), callbackMap: new Map() };
+    const options = { 
+      template: null, 
+      styles: null, 
+      stateMap: new Map(), 
+      propertyMap: new Map(), 
+      callbackMap: new Map(), 
+      referenceMap: new Map(),
+      watchCallbackMap: new Map(),
+      watchStateMap: new Map()
+    };
+
     this.options = options;
     this.name = name;
 
@@ -521,28 +624,48 @@ export class WebComponent {
       component: {
         state: state.bind(null, options),
         property: property.bind(null, options),
-        callback: weComponentCallback.bind(null, options)
+        callback: weComponentCallback.bind(null, options),
+        reference: reference.bind(null, options)
       }
     };
 
     callback(templateCallback, stylesCallback, lib);
 
-    if (template === null)
+    if (options.template === null)
       throw new Error("Template cannot be undefined or null.");
 
-    if (styles === null)
-      throw new Error("Styles cannot be undefiend or null.");
+    if (options.styles === null)
+      throw new Error("Styles cannot be undefined or null.");
   }
 
   public register() {
     customElements.define(this.name, createCustomElementClass(this.options) as CustomElementConstructor);
   }
 
-  public setPropertyValue(name: string, value: any) {
+  private _getProperty(name: string) {
     const property = this.options.propertyMap.get(name);
     if (!property)
       throw new Error("Property '" + name + "' is undefined.");
+    return property;
+  }
+
+  public setPropertyValue(name: string, value: any) {
+    const property = this._getProperty(name);
     property.setValue(value);
+  }
+
+  public setProperties(propertyObject: WebComponentPropertiesObject) {
+    for (const property in propertyObject)
+      this.setPropertyValue(property, propertyObject[property]);
+  }
+
+  public watchProperty(name: string, callback: Function) {
+    let list = this.options.watchCallbackMap.get(name);
+    if (!list) {
+      list = [];
+      this.options.watchCallbackMap.set(name, list);
+    }
+    list.push(callback);
   }
 
   private _setStateValue(name: string, value: boolean) {
@@ -558,6 +681,11 @@ export class WebComponent {
 
   public setStateOff(name: string) {
     this._setStateValue(name, false);
+  }
+
+  public setStates(stateObject: WebComponentStatesObject) {
+    for (const state in stateObject)
+      this._setStateValue(state, stateObject[state]!);
   }
 
   public setCallbackValue(name: string, value: Function) {
@@ -577,16 +705,18 @@ interface WebComponentElementConstructor {
   watchState(name: string, callback: SignalFunctionCallback<boolean>): void;
 }
 
-function createCustomElementClass(hostOptions: WebComponentInitializationOptions): Function {
+// CustomElement
+function createCustomElementClass(hostOptions: WebComponentInitOptions): Function {
   const template = hostOptions.template;
   const styles = hostOptions.styles;
-
+  
   const propertyNameList = [...hostOptions.propertyMap.keys()].map(name => name.toLowerCase());
   
   const elementConstructor = class extends HTMLElement implements WebComponentElementConstructor {
     private propertyMap: Map<string, Signal<any>> = new Map();
     private stateMap: Map<string, Signal<boolean>> = new Map();
     private callbackMap: Map<string, Signal<Function>> = new Map();
+    private referenceMap: Map<string, Signal<HTMLElement>> = new Map();
 
     public static observedAttributes = propertyNameList;
 
@@ -602,7 +732,17 @@ function createCustomElementClass(hostOptions: WebComponentInitializationOptions
       for (const [propertyName, callback] of hostOptions.callbackMap)
         this.callbackMap.set(propertyName, new Signal<Function>(callback.getValue()));
 
+      for (const [propertyName, propertyList] of hostOptions.watchCallbackMap) {
+        for (const callback of propertyList) {
+          this.propertyMap.get(propertyName)?.effect(callback.bind(this) as SignalFunctionCallback<any>);
+        }
+      }
+
       template!.initialize(this as WebComponentElementConstructor);
+
+      for (const [propertyName, reference] of hostOptions.referenceMap) {
+        this.referenceMap.set(propertyName, new Signal<HTMLElement>(reference.getValue()!));
+      }
       styles!.attach();
     }
 
@@ -615,7 +755,7 @@ function createCustomElementClass(hostOptions: WebComponentInitializationOptions
     }
 
     private _getPropertySignal(name: string): Signal<any> {
-      const property = this.propertyMap.get(name);
+      const property = this.propertyMap.get(name.toLowerCase());
       if (!property)
         throw new Error("Property '" + name + "' is not defined.");
       return property;
@@ -629,6 +769,11 @@ function createCustomElementClass(hostOptions: WebComponentInitializationOptions
     public setPropertyValue(name: string, value: string) {
       const property = this._getPropertySignal(name);
       property.set(value);
+    }
+
+    public getPropertyValue(name: string) {
+      const property = this._getPropertySignal(name);
+      return property.get();
     }
 
     public _getStateSignal(name: string): Signal<boolean> {
@@ -651,6 +796,23 @@ function createCustomElementClass(hostOptions: WebComponentInitializationOptions
     public setStateOff(name: string) {
       const state = this._getStateSignal(name);
       state.set(false);
+    }
+
+    public isStateOn(name: string) {
+      const state = this._getStateSignal(name);
+      return state.get() === true;
+    }
+
+    public isStateOff(name: string) {
+      const state = this._getStateSignal(name);
+      return state.get() === false;
+    }
+
+    public getReference(name: string) {
+      const ref = this.referenceMap.get(name);
+      if (!ref)
+        throw new Error("Reference '" + name + "' is undefined.");
+      return ref.get();
     }
 
     public attributeChangedCallback(name: string, oldValue: string, newValue: string) {

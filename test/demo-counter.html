@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+
+  <demo-counter></demo-counter>
+  
+  <script type="importmap">
+    {
+      "imports": {
+        "webcomp": "../dist/webcomp.js",
+        "webcomp-minified": "../minified/webcomp.min.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import { WebComponent } from "webcomp";
+
+    const counter = new WebComponent("demo-counter", (template, styles, lib) => {
+      const { div, p, button } = lib.dom;
+      const { property, callback } = lib.component;
+
+      template(
+        div({ className: "counter-container" },
+          p({ className: "counter-value" }, "Count: ", property("count", 0)),
+          div({ className: "counter-buttons" },
+            button({ className: "counter-button", onClick: callback("btnDecrease") }, "Decrease (-)"),
+            button({ className: "counter-button", onClick: callback("btnIncrease") }, "Increase (+)")
+          )
+        )
+      );
+
+      styles({
+        ".counter-container": {
+          display: "flex",
+          flexDirection: "column",
+          border: "1px solid black",
+          maxWidth: "360px",
+          borderRadius: "8px"
+        },
+        ".counter-buttons": {
+          display: "flex",
+          padding: "8px",
+          gap: "8px"
+        },
+        ".counter-button": {
+          flexGrow: "1",
+          height: "40px"
+        },
+        ".counter-value": {
+          fontFamily: "Consolas, monospace",
+          fontSize: "36px",
+          padding: "8px",
+          textAlign: "center",
+          fontWeight: "bold"
+        }
+      });
+    });
+
+    counter.setCallbackValue("btnDecrease", function() {
+      this.updatePropertyValue("count", (value) => {
+        return --value;
+      });
+    });
+
+    counter.setCallbackValue("btnIncrease", function() {
+      this.updatePropertyValue("count", (value) => {
+        return ++value;
+      });
+    });
+
+    counter.setPropertyValue("count", 0);
+
+    counter.register();
+  </script>
+</body>
+</html>

@@ -1,5 +1,36 @@
 {
   "dependencies": {
     "uglify-js": "^3.19.3"
-  }
+  },
+  "name": "webcomp.js",
+  "version": "1.0.0",
+  "description": "Other implementation of Web Components based on React that uses Signal for reactivity but in plain JavaScript",
+  "main": "src/webcomp.ts",
+  "directories": {
+    "test": "test"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "build": "tsc & npx uglify-js ./dist/webcomp.js --source-map \"content='./dist/webcomp.js.map', url='../minified/webcomp.min.js.map',includeSources\" -o ./minified/webcomp.min.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EdgenDy/web-components-edge.git"
+  },
+  "keywords": [
+    "component",
+    "webcomponent",
+    "web",
+    "component",
+    "reactivity",
+    "signal",
+    "dom"
+  ],
+  "author": "Edgen Dy",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/EdgenDy/web-components-edge/issues"
+  },
+  "homepage": "https://github.com/EdgenDy/web-components-edge#readme"
 }
